@@ -12,7 +12,7 @@ import sys
 import textwrap
 
 from .config import load_project_env, provider_env
-from .mascot import MASCOT_NORMAL, classify_mascot_state, print_mascot
+from .mascot import MASCOT_NORMAL, classify_mascot_state, mascot_art, print_mascot, render_mascot
 from .providers.clients import AnthropicCompatibleModelClient, OllamaModelClient, OpenAICompatibleModelClient
 from .runtime import Allright, SessionStore
 from .workspace import WorkspaceContext, middle
@@ -176,7 +176,7 @@ def _build_model_client(args):
     )
 
 
-def build_welcome(agent, model, host, mascot_state=MASCOT_NORMAL):
+def build_welcome(agent, model, host, mascot_state=MASCOT_NORMAL, mascot_text=None):
     width = max(68, min(shutil.get_terminal_size((80, 20)).columns, 84))
     inner = width - 4
     gap = 3
@@ -203,8 +203,13 @@ def build_welcome(agent, model, host, mascot_state=MASCOT_NORMAL):
         right = cell(right_label, right_value, right_width)
         return f"| {left}{' ' * gap}{right} |"
 
+    if mascot_text is None:
+        mascot_text = mascot_art(mascot_state)
+    mascot_rows = [center(art_line) for art_line in mascot_text.splitlines()] if mascot_text else []
+
     line = divider("=")
     rows = [
+        *mascot_rows,
         center(WELCOME_NAME),
         center(WELCOME_SUBTITLE),
         center(WELCOME_STATUSES[mascot_state]),
@@ -311,8 +316,8 @@ def main(argv=None):
     model = getattr(agent.model_client, "model", getattr(args, "model", DEFAULT_OLLAMA_MODEL))
     host = getattr(agent.model_client, "host", getattr(agent.model_client, "base_url", getattr(args, "host", DEFAULT_OLLAMA_HOST)))
     mascot_state = classify_mascot_state(agent.model_client)
-    print_mascot(mascot_state)
-    print(build_welcome(agent, model=model, host=host, mascot_state=mascot_state))
+    mascot_text = render_mascot(mascot_state)
+    print(build_welcome(agent, model=model, host=host, mascot_state=mascot_state, mascot_text=mascot_text))
 
     if args.prompt:
         # one-shot 模式：只跑一次 ask，不进入 REPL 循环。

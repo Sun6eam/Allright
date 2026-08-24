@@ -7,7 +7,7 @@ from allright.mascot import (
     MASCOT_NORMAL,
     MASCOT_OFFLINE,
     classify_mascot_state,
-    mascot_asset_path,
+    mascot_art,
     render_mascot,
 )
 from allright.providers.clients import AnthropicCompatibleModelClient, OpenAICompatibleModelClient
@@ -18,10 +18,15 @@ class ApiClient:
         self.api_key = api_key
 
 
-def test_mascot_assets_are_packaged_for_each_state():
+def test_ascii_mascot_exists_for_each_state():
     for state in (MASCOT_NORMAL, MASCOT_ERROR, MASCOT_OFFLINE):
-        assert mascot_asset_path(state).is_file()
-        assert mascot_asset_path(state, ".ansi").is_file()
+        art = mascot_art(state)
+        assert len(art.splitlines()) == 5
+        assert "A" in art
+
+    assert "^.^" in mascot_art(MASCOT_NORMAL)
+    assert "-.-" in mascot_art(MASCOT_OFFLINE)
+    assert "x.x" in mascot_art(MASCOT_ERROR)
 
 
 def test_mascot_state_uses_offline_for_missing_api_key_or_network_error():
@@ -35,19 +40,16 @@ def test_mascot_state_uses_error_for_other_failures():
     assert classify_mascot_state(ApiClient("sk-test")) == MASCOT_NORMAL
 
 
-def test_ansi_mascot_can_be_forced_for_snapshot_or_pipe_output():
+def test_ascii_mascot_can_be_forced_for_snapshot_or_pipe_output():
     rendered = render_mascot(
         MASCOT_NORMAL,
         stream=StringIO(),
         env={
             "ALLRIGHT_FORCE_MASCOT": "1",
-            "ALLRIGHT_MASCOT_PROTOCOL": "ansi",
-            "COLUMNS": "80",
         },
     )
-    assert "\x1b[38;2;" in rendered
-    assert "▀" in rendered
-    assert all(line.startswith(" " * 25) for line in rendered.splitlines())
+    assert rendered == mascot_art(MASCOT_NORMAL)
+    assert "\x1b" not in rendered
 
 
 def test_mascot_stays_quiet_for_non_tty_and_supports_opt_out():
@@ -56,7 +58,7 @@ def test_mascot_stays_quiet_for_non_tty_and_supports_opt_out():
         render_mascot(
             MASCOT_NORMAL,
             stream=StringIO(),
-            env={"ALLRIGHT_FORCE_MASCOT": "1", "ALLRIGHT_MASCOT_PROTOCOL": "off"},
+            env={"ALLRIGHT_FORCE_MASCOT": "1", "ALLRIGHT_MASCOT": "off"},
         )
         == ""
     )

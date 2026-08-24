@@ -49,19 +49,17 @@ REPL 内置命令与会话路径：
 
 Allright 会根据当前运行状态切换启动吉祥物：
 
-- normal：provider 配置完整、程序正常运行时显示咧嘴猫
-- offline：缺少 API Key，或模型请求遇到网络、超时、401/403 与鉴权问题时显示发呆猫
-- error：模型响应解析等其他运行错误时显示受伤猫
+- normal：provider 配置完整、程序正常运行时显示开心猫
+- offline：缺少 API Key，或模型请求遇到网络、超时、401/403 与鉴权问题时显示休眠猫
+- error：模型响应解析等其他运行错误时显示故障猫
 
-Kitty、iTerm2 和 WezTerm 会优先使用原生终端图片协议；其他现代终端使用由同一张 PNG 生成的 ANSI true-color 字符图。重定向输出或 CI 中默认不显示吉祥物，避免污染日志。
+吉祥物使用纯 ASCII 符号绘制，不再依赖图片协议或终端真彩色能力。启动时它位于欢迎面板内、紧贴在 `allright` 标题正上方；重定向输出或 CI 中默认不显示，避免污染日志。
 
 可以通过环境变量控制渲染：
 
     # 禁用吉祥物
     ALLRIGHT_MASCOT=off allright
 
-    # 强制选择渲染协议：ansi / kitty / iterm / off
-    ALLRIGHT_MASCOT_PROTOCOL=ansi allright
 
 ## 安装
 

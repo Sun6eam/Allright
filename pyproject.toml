@@ -23,8 +23,5 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["allright*"]
 
-[tool.setuptools.package-data]
-allright = ["assets/mascots/*.png", "assets/mascots/*.ansi"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -295,6 +295,7 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
     assert "MINI CODING AGENT" not in welcome
     assert "allright" in welcome
     assert "local coding agent" in welcome
+    assert welcome.index("/\\_/\\") < welcome.index("allright")
     assert "// READY" not in welcome
     assert "SLASH" not in welcome
     assert "READY      " not in welcome
@@ -307,6 +308,15 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
         mascot_state="offline",
     )
     assert "api key or network unavailable" in offline_welcome
+    assert "-.-" in offline_welcome
+
+    welcome_without_mascot = build_welcome(
+        agent,
+        model="qwen3.5:4b",
+        host="http://127.0.0.1:11434",
+        mascot_text="",
+    )
+    assert "/\\_/\\" not in welcome_without_mascot
 
 
 def test_ollama_client_posts_expected_payload():
