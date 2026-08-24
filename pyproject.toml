@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "allright"
+version = "0.1.0"
+description = "Local coding agent harness for long-running repository tasks"
+requires-python = ">=3.10"
+dependencies = [
+  "tzdata>=2024.1; platform_system == 'Windows'",
+]
+
+[project.scripts]
+allright = "allright.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.5",
+  "ruff>=0.4.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["allright*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
