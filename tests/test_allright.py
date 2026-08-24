@@ -290,7 +290,7 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
     assert len(lines) >= 5
     assert len({len(line) for line in lines}) == 1
     assert "..." in welcome
-    assert "(  o o  )" in welcome
+    assert "(  o o  )" not in welcome
     assert "MINI-CODING-AGENT" not in welcome
     assert "MINI CODING AGENT" not in welcome
     assert "allright" in welcome
@@ -299,6 +299,14 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
     assert "SLASH" not in welcome
     assert "READY      " not in welcome
     assert "commands: Commands:" not in welcome
+
+    offline_welcome = build_welcome(
+        agent,
+        model="qwen3.5:4b",
+        host="http://127.0.0.1:11434",
+        mascot_state="offline",
+    )
+    assert "api key or network unavailable" in offline_welcome
 
 
 def test_ollama_client_posts_expected_payload():

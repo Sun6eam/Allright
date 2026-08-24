@@ -12,6 +12,7 @@ import sys
 import textwrap
 
 from .config import load_project_env, provider_env
+from .mascot import MASCOT_NORMAL, classify_mascot_state, print_mascot
 from .providers.clients import AnthropicCompatibleModelClient, OllamaModelClient, OpenAICompatibleModelClient
 from .runtime import Allright, SessionStore
 from .workspace import WorkspaceContext, middle
@@ -31,15 +32,13 @@ DEFAULT_SECRET_ENV_NAMES = (
     "GH_PAT",
 )
 
-WELCOME_ART = (
-    "        /\\___/\\\\",
-    "       (  o o  )",
-    "       /   ^   \\\\",
-    "      /|       |\\\\",
-)
 WELCOME_NAME = "allright"
 WELCOME_SUBTITLE = "local coding agent"
-WELCOME_STATUS = "calm shell, ready for work"
+WELCOME_STATUSES = {
+    "normal": "calm shell, ready for work",
+    "offline": "api key or network unavailable",
+    "error": "runtime error, check diagnostics",
+}
 HELP_DETAILS = textwrap.dedent(
     """\
     Commands:
@@ -177,7 +176,7 @@ def _build_model_client(args):
     )
 
 
-def build_welcome(agent, model, host):
+def build_welcome(agent, model, host, mascot_state=MASCOT_NORMAL):
     width = max(68, min(shutil.get_terminal_size((80, 20)).columns, 84))
     inner = width - 4
     gap = 3
@@ -205,20 +204,17 @@ def build_welcome(agent, model, host):
         return f"| {left}{' ' * gap}{right} |"
 
     line = divider("=")
-    rows = [center(text) for text in WELCOME_ART]
-    rows.extend(
-        [
-            center(WELCOME_NAME),
-            center(WELCOME_SUBTITLE),
-            center(WELCOME_STATUS),
-            divider("-"),
-            row(""),
-            row("WORKSPACE  " + middle(agent.workspace.cwd, inner - 11)),
-            pair("MODEL", model, "BRANCH", agent.workspace.branch),
-            pair("APPROVAL", agent.approval_policy, "SESSION", agent.session["id"]),
-            row(""),
-        ]
-    )
+    rows = [
+        center(WELCOME_NAME),
+        center(WELCOME_SUBTITLE),
+        center(WELCOME_STATUSES[mascot_state]),
+        divider("-"),
+        row(""),
+        row("WORKSPACE  " + middle(agent.workspace.cwd, inner - 11)),
+        pair("MODEL", model, "BRANCH", agent.workspace.branch),
+        pair("APPROVAL", agent.approval_policy, "SESSION", agent.session["id"]),
+        row(""),
+    ]
     return "\n".join([line, *rows, line])
 
 
@@ -314,7 +310,9 @@ def main(argv=None):
 
     model = getattr(agent.model_client, "model", getattr(args, "model", DEFAULT_OLLAMA_MODEL))
     host = getattr(agent.model_client, "host", getattr(agent.model_client, "base_url", getattr(args, "host", DEFAULT_OLLAMA_HOST)))
-    print(build_welcome(agent, model=model, host=host))
+    mascot_state = classify_mascot_state(agent.model_client)
+    print_mascot(mascot_state)
+    print(build_welcome(agent, model=model, host=host, mascot_state=mascot_state))
 
     if args.prompt:
         # one-shot 模式：只跑一次 ask，不进入 REPL 循环。
@@ -324,6 +322,7 @@ def main(argv=None):
             try:
                 print(agent.ask(prompt))
             except RuntimeError as exc:
+                print_mascot(classify_mascot_state(agent.model_client, exc), stream=sys.stderr)
                 print(str(exc), file=sys.stderr)
                 return 1
         return 0
@@ -359,4 +358,5 @@ def main(argv=None):
         try:
             print(agent.ask(user_input))
         except RuntimeError as exc:
+            print_mascot(classify_mascot_state(agent.model_client, exc), stream=sys.stderr)
             print(str(exc), file=sys.stderr)

@@ -253,6 +253,8 @@ class OpenAICompatibleModelClient:
         落到 provider API 的地方。
         """
         self.last_completion_metadata = {}
+        if not self.api_key:
+            raise RuntimeError("OpenAI-compatible API key is missing")
         payload = {
             "model": self.model,
             "input": [
@@ -392,6 +394,8 @@ class AnthropicCompatibleModelClient:
         # 这里只是显式丢弃，因为当前 Anthropic-compatible 路径没有接缓存复用。
         del prompt_cache_key, prompt_cache_retention
         self.last_completion_metadata = {}
+        if not self.api_key:
+            raise RuntimeError("Anthropic-compatible API key is missing")
         payload = {
             "model": self.model,
             "messages": [
