@@ -39,10 +39,15 @@ def test_ansi_mascot_can_be_forced_for_snapshot_or_pipe_output():
     rendered = render_mascot(
         MASCOT_NORMAL,
         stream=StringIO(),
-        env={"ALLRIGHT_FORCE_MASCOT": "1", "ALLRIGHT_MASCOT_PROTOCOL": "ansi"},
+        env={
+            "ALLRIGHT_FORCE_MASCOT": "1",
+            "ALLRIGHT_MASCOT_PROTOCOL": "ansi",
+            "COLUMNS": "80",
+        },
     )
     assert "\x1b[38;2;" in rendered
     assert "▀" in rendered
+    assert all(line.startswith(" " * 25) for line in rendered.splitlines())
 
 
 def test_mascot_stays_quiet_for_non_tty_and_supports_opt_out():

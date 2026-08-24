@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -92,6 +93,16 @@ def _render_iterm(png_data: bytes) -> str:
     return f"\x1b]1337;File=inline=1;width=30;height=12;preserveAspectRatio=1:{encoded}\x07"
 
 
+def _mascot_indent(env, width: int = 30) -> str:
+    try:
+        columns = int(env.get("COLUMNS", ""))
+    except (TypeError, ValueError):
+        columns = 0
+    if columns <= 0:
+        columns = shutil.get_terminal_size((80, 20)).columns
+    return " " * max(0, (columns - width) // 2)
+
+
 def render_mascot(state: str, stream=None, env=None) -> str:
     """Render a mascot using a native image protocol or packaged ANSI fallback."""
     if state not in MASCOT_STATES:
@@ -104,13 +115,15 @@ def render_mascot(state: str, stream=None, env=None) -> str:
     force = str(env.get("ALLRIGHT_FORCE_MASCOT", "")).lower() in {"1", "true", "on"}
     if not force and not getattr(stream, "isatty", lambda: False)():
         return ""
+    indent = _mascot_indent(env)
     if protocol == "kitty":
-        return _render_kitty(mascot_asset_path(state).read_bytes())
+        return indent + _render_kitty(mascot_asset_path(state).read_bytes())
     if protocol == "iterm":
-        return _render_iterm(mascot_asset_path(state).read_bytes())
+        return indent + _render_iterm(mascot_asset_path(state).read_bytes())
     if env.get("NO_COLOR") or str(env.get("TERM", "")).lower() == "dumb":
         return f"[allright mascot: {state}]"
-    return mascot_asset_path(state, ".ansi").read_text(encoding="utf-8").rstrip("\r\n")
+    ansi = mascot_asset_path(state, ".ansi").read_text(encoding="utf-8").rstrip("\r\n")
+    return "\n".join(indent + line for line in ansi.splitlines())
 
 
 def print_mascot(state: str, stream=None, env=None) -> None:

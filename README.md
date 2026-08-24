@@ -31,6 +31,8 @@ Allright 重点解决多轮任务中常见的 prompt 膨胀、重复读取文件
 
 ## 使用截图
 
+以下截图由本仓库代码实际运行后捕获，终端内容、工作区路径、状态信息和 session ID 均来自真实 CLI 输出。
+
 CLI 帮助信息：
 
 ![allright help](assets/screenshots/allright-help.png)
