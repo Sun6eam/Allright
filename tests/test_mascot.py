@@ -22,6 +22,7 @@ def test_ascii_mascot_exists_for_each_state():
     for state in (MASCOT_NORMAL, MASCOT_ERROR, MASCOT_OFFLINE):
         art = mascot_art(state)
         assert len(art.splitlines()) == 5
+        assert {len(line) for line in art.splitlines()} == {15}
         assert "A" in art
 
     assert "^.^" in mascot_art(MASCOT_NORMAL)

@@ -9,28 +9,36 @@ MASCOT_NORMAL = "normal"
 MASCOT_ERROR = "error"
 MASCOT_OFFLINE = "offline"
 MASCOT_STATES = (MASCOT_NORMAL, MASCOT_ERROR, MASCOT_OFFLINE)
+MASCOT_WIDTH = 15
+
+_CAT_HEAD = "/\\_/\\"
+_CAT_BODY = "(_|_____|_)"
+
+
+def _center_cat_line(text: str) -> str:
+    return text.center(MASCOT_WIDTH)
 
 MASCOT_ART = {
     MASCOT_NORMAL: (
-        "    /\\_/\\",
-        "   ( ^.^ )",
-        "   / > < \\",
-        "  /|  A  |\\",
-        " (_|_____|_)",
+        _center_cat_line(_CAT_HEAD),
+        _center_cat_line("( ^.^ )"),
+        _center_cat_line("/ > < \\"),
+        _center_cat_line("/|  A  |\\"),
+        _center_cat_line(_CAT_BODY),
     ),
     MASCOT_OFFLINE: (
-        " z  /\\_/\\",
-        "   ( -.- )",
-        "   /  ~  \\",
-        "  /|  A  |\\",
-        " (_|_____|_) x",
+        (" z   " + _CAT_HEAD).ljust(MASCOT_WIDTH),
+        _center_cat_line("( -.- )"),
+        _center_cat_line("/  ~  \\"),
+        _center_cat_line("/|  A  |\\"),
+        ("  " + _CAT_BODY + " x").ljust(MASCOT_WIDTH),
     ),
     MASCOT_ERROR: (
-        " !  /\\_/\\",
-        "   ( x.x )",
-        "   /  !  \\",
-        "  /|  A  |\\",
-        " (_|_____|_)",
+        (" !   " + _CAT_HEAD + "   !").ljust(MASCOT_WIDTH),
+        _center_cat_line("( x.x )"),
+        _center_cat_line("/  !  \\"),
+        _center_cat_line("/|  A  |\\"),
+        _center_cat_line(_CAT_BODY),
     ),
 }
 
