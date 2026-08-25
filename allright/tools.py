@@ -4,6 +4,7 @@
 如何做参数校验，以及最终如何执行，都是在这里定义的。
 """
 
+import os
 import shutil
 import subprocess
 import textwrap
@@ -210,6 +211,21 @@ def tool_search(context, args):
     return "\n".join(matches) or "(no matches)"
 
 
+def _shell_invocation(command, env):
+    """Return an explicit shell invocation that also works with a filtered env."""
+    if os.name != "nt":
+        return command, True
+    comspec = env.get("ComSpec")
+    if not comspec:
+        system_root = env.get("SystemRoot") or env.get("WINDIR")
+        if system_root:
+            comspec = os.path.join(system_root, "System32", "cmd.exe")
+    if not comspec:
+        raise FileNotFoundError("Windows shell not found in the filtered environment")
+    quoted_shell = subprocess.list2cmdline([comspec])
+    return f'{quoted_shell} /d /s /c "{command}"', False
+
+
 def tool_run_shell(context, args):
     command = str(args.get("command", "")).strip()
     if not command:
@@ -217,16 +233,18 @@ def tool_run_shell(context, args):
     timeout = int(args.get("timeout", 20))
     if timeout < 1 or timeout > 120:
         raise ValueError("timeout must be in [1, 120]")
+    shell_env = context.shell_env()
+    invocation, use_shell = _shell_invocation(command, shell_env)
     result = subprocess.run(
-        command,
+        invocation,
         cwd=context.root,
-        shell=True,
+        shell=use_shell,
         capture_output=True,
         text=True,
         timeout=timeout,
         # 这里传入的是过滤后的环境变量，而不是直接继承整个父 shell 环境，
         # 目的是减少敏感信息被意外带进命令执行环境的风险。
-        env=context.shell_env(),
+        env=shell_env,
     )
     return textwrap.dedent(
         f"""\
