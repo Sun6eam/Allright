@@ -1,5 +1,6 @@
 import os
 import shlex
+import subprocess
 import sys
 from unittest.mock import patch
 
@@ -147,7 +148,8 @@ def test_run_shell_uses_allowlisted_environment_only(tmp_path):
     secret = "shh-allowlist-secret"
     agent = build_agent(tmp_path, [], approval_policy="auto")
     script = 'import os; print(os.getenv("ALLRIGHT_ALLOWLIST_SECRET", "missing"))'
-    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+    command_parts = [sys.executable, "-c", script]
+    command = subprocess.list2cmdline(command_parts) if os.name == "nt" else shlex.join(command_parts)
 
     with patch.dict(os.environ, {"ALLRIGHT_ALLOWLIST_SECRET": secret}, clear=False):
         result = agent.run_tool("run_shell", {"command": command, "timeout": 20})

@@ -1,5 +1,6 @@
 import os
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -1085,11 +1086,17 @@ def test_successful_run_persists_run_artifacts_and_stop_reason(tmp_path):
 
 def test_trace_and_report_redact_secret_env_values(tmp_path):
     secret = "sk-test-secret-123"
+    script = f"print({secret!r})"
+    command_parts = [sys.executable, "-c", script]
+    command = subprocess.list2cmdline(command_parts) if os.name == "nt" else shlex.join(command_parts)
+    tool_call = "<tool>" + json.dumps(
+        {"name": "run_shell", "args": {"command": command, "timeout": 20}}
+    ) + "</tool>"
     with patch.dict(os.environ, {"OPENAI_API_KEY": secret}, clear=True):
         agent = build_agent(
             tmp_path,
             [
-                '<tool>{"name":"run_shell","args":{"command":"printf \'%s\' \'sk-test-secret-123\'","timeout":20}}</tool>',
+                tool_call,
                 "<final>Masked.</final>",
             ],
         )

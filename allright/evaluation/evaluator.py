@@ -1,8 +1,10 @@
 import hashlib
 import json
 import locale as locale_module
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -128,6 +130,17 @@ def _current_locale():
 
 def _now_in_timezone(timezone_name):
     return datetime.now(ZoneInfo(timezone_name)).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def _verifier_argv(command):
+    """Parse trusted benchmark verifier text into a cross-platform argv."""
+    argv = shlex.split(str(command), posix=True)
+    if not argv:
+        raise ValueError("benchmark verifier must not be empty")
+    executable = Path(argv[0]).name.lower()
+    if executable in {"python", "python3", "python.exe", "python3.exe"}:
+        argv[0] = sys.executable
+    return argv
 
 
 def _artifact_path_for_task(task):
@@ -490,9 +503,9 @@ class BenchmarkEvaluator:
         artifact_digest = _digest_file(artifact_file) if expected_artifact_exists else ""
 
         verifier = subprocess.run(
-            task["verifier"],
+            _verifier_argv(task["verifier"]),
             cwd=fixture_copy_root,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
         )
