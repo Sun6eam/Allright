@@ -5,8 +5,9 @@ session.json 负责保存“可恢复的会话状态”；RunStore 负责保存�
 """
 
 import json
-import tempfile
 from pathlib import Path
+
+from .persistence import append_jsonl, repair_jsonl_tail, write_json_atomic
 
 
 def _run_id(value):
@@ -16,9 +17,10 @@ def _run_id(value):
 
 
 class RunStore:
-    def __init__(self, root):
+    def __init__(self, root, fault_injector=None):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self.fault_injector = fault_injector
 
     def run_dir(self, run_id):
         return self.root / _run_id(run_id)
@@ -43,23 +45,35 @@ class RunStore:
     def write_task_state(self, task_state):
         path = self.task_state_path(task_state)
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._write_json_atomic(path, task_state.to_dict())
+        write_json_atomic(
+            path,
+            task_state.to_dict(),
+            fault_injector=self.fault_injector,
+            fault_prefix="run.task_state",
+        )
         return path
 
     def append_trace(self, task_state, event):
         path = self.trace_path(task_state)
         path.parent.mkdir(parents=True, exist_ok=True)
-        # trace 采用 jsonl 追加写入，原因是 agent 运行过程是流式事件序列，
-        # 逐条落盘比“最后一次性写整份 trace”更稳，也更适合调试。
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, sort_keys=True, ensure_ascii=True))
-            handle.write("\n")
-        return path
+        # 每条事件在 fsync 后才视为持久化。若进程在半行写入时崩溃，
+        # 下一次追加会只移除损坏的尾记录，不会掩盖中间损坏。
+        return append_jsonl(
+            path,
+            event,
+            fault_injector=self.fault_injector,
+            fault_prefix="run.trace",
+        )
 
     def write_report(self, task_state, report):
         path = self.report_path(task_state)
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._write_json_atomic(path, report)
+        write_json_atomic(
+            path,
+            report,
+            fault_injector=self.fault_injector,
+            fault_prefix="run.report",
+        )
         return path
 
     def load_task_state(self, task_id):
@@ -68,18 +82,14 @@ class RunStore:
     def load_report(self, task_id):
         return json.loads(self.report_path(task_id).read_text(encoding="utf-8"))
 
-    def _write_json_atomic(self, path, payload):
-        # 原子写：先写临时文件，再 replace。
-        # 这样即使中途异常，也不容易留下半截 JSON。
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            delete=False,
-            dir=str(path.parent),
-            prefix=path.name + ".",
-            suffix=".tmp",
-        ) as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            temp_name = handle.name
-        Path(temp_name).replace(path)
+    def load_trace(self, task_id, repair_tail=True):
+        path = self.trace_path(task_id)
+        if not path.exists():
+            return []
+        if repair_tail:
+            repair_jsonl_tail(path)
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
