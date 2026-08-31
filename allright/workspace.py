@@ -17,6 +17,50 @@ MAX_HISTORY = 12000
 # 我们不会预加载整个仓库，只会先给模型一小份“导航包”。
 DOC_NAMES = ("AGENTS.md", "README.md", "pyproject.toml", "package.json")
 IGNORED_PATH_NAMES = {".git", ".allright", "__pycache__", ".pytest_cache", ".ruff_cache", ".venv", "venv"}
+PROTECTED_FILE_NAMES = {
+    ".env",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    "credentials.json",
+    "secrets.json",
+    "id_rsa",
+    "id_ed25519",
+}
+SAFE_ENV_TEMPLATE_SUFFIXES = (".example", ".sample", ".template")
+WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{number}" for number in range(1, 10)),
+    *(f"LPT{number}" for number in range(1, 10)),
+}
+
+
+def is_protected_workspace_path(path):
+    """Return whether a repository-relative path may contain runtime secrets."""
+
+    for part in Path(path).parts:
+        lowered = part.lower()
+        if lowered in IGNORED_PATH_NAMES or lowered in PROTECTED_FILE_NAMES:
+            return True
+        if lowered.startswith(".env.") and not lowered.endswith(SAFE_ENV_TEMPLATE_SUFFIXES):
+            return True
+    return False
+
+
+def is_unsafe_windows_path(path):
+    """Reject NTFS alternate streams and reserved DOS device aliases."""
+
+    for part in Path(path).parts:
+        normalized = part.rstrip(" .")
+        if ":" in normalized:
+            return True
+        stem = normalized.split(".", 1)[0].upper()
+        if stem in WINDOWS_RESERVED_NAMES:
+            return True
+    return False
 
 
 def now():

@@ -24,7 +24,15 @@ from .session_store import SessionStore
 from .tool_context import ToolContext
 from .tool_executor import ToolExecutor
 from . import tools as toolkit
-from .workspace import IGNORED_PATH_NAMES, MAX_HISTORY, WorkspaceContext, clip, now
+from .workspace import (
+    IGNORED_PATH_NAMES,
+    MAX_HISTORY,
+    WorkspaceContext,
+    clip,
+    is_protected_workspace_path,
+    is_unsafe_windows_path,
+    now,
+)
 
 DEFAULT_SHELL_ENV_ALLOWLIST = (
     "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "PATH", "PWD", "SHELL",
@@ -273,7 +281,9 @@ class Allright:
         return prompt
 
     def record(self, item):
-        self.session["history"].append(item)
+        # Session 会在下一轮进入模型上下文，因此不能只在 trace/report 层脱敏。
+        # 这里统一清洗用户消息和工具结果，避免密钥通过可恢复历史回流给模型。
+        self.session["history"].append(self.redact_artifact(item))
         self.session_path = self.session_store.save(self.session)
 
     @staticmethod
@@ -406,6 +416,7 @@ class Allright:
         """
         if not self.feature_enabled("memory"):
             return
+        result = self.redact_text(result)
         path = args.get("path")
         if not path:
             return
@@ -777,6 +788,12 @@ class Allright:
         resolved = path.resolve()
         # 所有文件类工具都被锚定在 workspace root 之下。
         # 这样既能防住 "../" 逃逸，也能防住符号链接解析后跳出仓库。
-        if os.path.commonpath([str(self.root), str(resolved)]) != str(self.root):
+        try:
+            relative = resolved.relative_to(self.root.resolve())
+        except ValueError:
             raise ValueError(f"path escapes workspace: {raw_path}")
+        if is_protected_workspace_path(relative):
+            raise ValueError(f"protected workspace path: {raw_path}")
+        if os.name == "nt" and is_unsafe_windows_path(relative):
+            raise ValueError(f"unsafe Windows path: {raw_path}")
         return resolved

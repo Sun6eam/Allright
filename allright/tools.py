@@ -10,7 +10,7 @@ import subprocess
 import textwrap
 from functools import partial
 
-from .workspace import IGNORED_PATH_NAMES
+from .workspace import IGNORED_PATH_NAMES, is_protected_workspace_path
 
 BASE_TOOL_SPECS = {
     "list_files": {
@@ -50,6 +50,25 @@ DELEGATE_TOOL_SPEC = {
     "risky": False,
     "description": "Ask a bounded read-only child agent to investigate.",
 }
+
+PROTECTED_RG_GLOBS = (
+    "!**/.git/**",
+    "!**/.allright/**",
+    "!**/__pycache__/**",
+    "!**/.pytest_cache/**",
+    "!**/.ruff_cache/**",
+    "!**/.venv/**",
+    "!**/venv/**",
+    "!**/.env",
+    "!**/.env.*",
+    "!**/.netrc",
+    "!**/.npmrc",
+    "!**/.pypirc",
+    "!**/credentials.json",
+    "!**/secrets.json",
+    "!**/id_rsa",
+    "!**/id_ed25519",
+)
 
 
 def legal_tool_names():
@@ -160,6 +179,7 @@ def tool_list_files(context, args):
     entries = [
         item for item in sorted(path.iterdir(), key=lambda item: (item.is_file(), item.name.lower()))
         if item.name not in IGNORED_PATH_NAMES
+        and not is_protected_workspace_path(item.relative_to(context.root))
     ]
     lines = []
     for entry in entries[:200]:
@@ -189,8 +209,22 @@ def tool_search(context, args):
 
     if shutil.which("rg"):
         # 优先用 rg，因为搜索会非常频繁，搜索延迟会直接影响 agent 控制循环。
+        protected_globs = [
+            argument
+            for pattern in PROTECTED_RG_GLOBS
+            for argument in ("--glob", pattern)
+        ]
         result = subprocess.run(
-            ["rg", "-n", "--smart-case", "--max-count", "200", pattern, str(path)],
+            [
+                "rg",
+                "-n",
+                "--smart-case",
+                "--max-count",
+                "200",
+                *protected_globs,
+                pattern,
+                str(path),
+            ],
             cwd=context.root,
             capture_output=True,
             text=True,
@@ -200,7 +234,9 @@ def tool_search(context, args):
     matches = []
     files = [path] if path.is_file() else [
         item for item in path.rglob("*")
-        if item.is_file() and not any(part in IGNORED_PATH_NAMES for part in item.relative_to(context.root).parts)
+        if item.is_file()
+        and not any(part in IGNORED_PATH_NAMES for part in item.relative_to(context.root).parts)
+        and not is_protected_workspace_path(item.relative_to(context.root))
     ]
     for file_path in files:
         for number, line in enumerate(file_path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
