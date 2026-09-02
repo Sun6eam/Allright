@@ -10,10 +10,21 @@ import os
 import shutil
 import sys
 import textwrap
+from pathlib import Path
 
 from .config import load_project_env, provider_env
-from .mascot import MASCOT_NORMAL, classify_mascot_state, mascot_art, print_mascot, render_mascot
-from .providers.clients import AnthropicCompatibleModelClient, OllamaModelClient, OpenAICompatibleModelClient
+from .mascot import (
+    MASCOT_NORMAL,
+    classify_mascot_state,
+    mascot_art,
+    print_mascot,
+    render_mascot,
+)
+from .providers.clients import (
+    AnthropicCompatibleModelClient,
+    OllamaModelClient,
+    OpenAICompatibleModelClient,
+)
 from .runtime import Allright, SessionStore
 from .workspace import WorkspaceContext, middle
 
@@ -62,6 +73,43 @@ DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic"
 DEFAULT_PROVIDER = "deepseek"
 PROVIDER_CHOICES = ("ollama", "openai", "anthropic", "deepseek")
 SECRET_ENV_NAMES_VAR = "ALLRIGHT_SECRET_ENV_NAMES"
+
+
+def build_doctor_arg_parser():
+    parser = argparse.ArgumentParser(
+        prog="allright doctor",
+        description="Check the local Allright environment without sending a model request.",
+    )
+    parser.add_argument("--cwd", default=".", help="Workspace directory to diagnose.")
+    parser.add_argument("--provider", choices=PROVIDER_CHOICES, default=None, help="Provider to validate.")
+    parser.add_argument("--base-url", default=None, help="Optional provider endpoint override.")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    return parser
+
+
+def _run_doctor_cli(argv):
+    from .doctor import run_doctor
+
+    args = build_doctor_arg_parser().parse_args(argv)
+    workspace = Path(args.cwd).resolve()
+    try:
+        load_project_env(workspace)
+        provider = args.provider or provider_env("ALLRIGHT_PROVIDER", default=DEFAULT_PROVIDER)
+        if provider not in PROVIDER_CHOICES:
+            choices = ", ".join(PROVIDER_CHOICES)
+            raise ValueError(f"unknown provider: {provider}. expected one of: {choices}")
+        report = run_doctor(workspace, provider, base_url=args.base_url)
+    except (OSError, ValueError) as exc:
+        error = f"environment configuration could not be loaded ({type(exc).__name__})"
+        if args.json:
+            import json
+
+            print(json.dumps({"status": "fail", "exit_code": 2, "error": error}, ensure_ascii=False, indent=2))
+        else:
+            print(f"Allright doctor failed: {error}", file=sys.stderr)
+        return 2
+    print(report.render_json() if args.json else report.render_text())
+    return report.exit_code
 
 
 def _effective_provider(args):
@@ -275,6 +323,7 @@ def build_arg_parser():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Minimal coding agent for DeepSeek, OpenAI-compatible, Anthropic-compatible, or Ollama models.",
+        epilog="Run 'allright doctor --help' to diagnose the local environment.",
     )
     parser.add_argument("prompt", nargs="*", help="Optional one-shot prompt.")
     parser.add_argument("--cwd", default=".", help="Workspace directory.")
@@ -310,7 +359,10 @@ def build_arg_parser():
 
 
 def main(argv=None):
-    args = build_arg_parser().parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    if raw_argv and raw_argv[0] == "doctor":
+        return _run_doctor_cli(raw_argv[1:])
+    args = build_arg_parser().parse_args(raw_argv)
     agent = build_agent(args)
 
     model = getattr(agent.model_client, "model", getattr(args, "model", DEFAULT_OLLAMA_MODEL))
@@ -338,7 +390,7 @@ def main(argv=None):
         try:
             user_input = input("\nallright> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("")
+            print()
             return 0
 
         if not user_input:

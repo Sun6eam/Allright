@@ -79,6 +79,20 @@ pip install -e .
 
 ## 快速开始
 
+第一次运行或遇到配置问题时，先执行离线环境诊断：
+
+```bash
+uv run allright doctor
+```
+
+`doctor` 不会向模型发送请求，也不会输出 API Key。它会检查 Python、Git、工作区、`.env`、Provider 配置、Shell 和本地状态写入能力。需要机器可读结果时使用：
+
+```bash
+uv run allright doctor --json
+```
+
+退出码含义：`0` 表示全部通过，`1` 表示存在警告，`2` 表示存在必须修复的错误。可以用 `--cwd`、`--provider` 和 `--base-url` 检查指定配置。
+
 在当前仓库里启动交互模式。默认 provider 是 DeepSeek：
 
 ```bash
